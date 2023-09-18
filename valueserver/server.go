@@ -12,8 +12,11 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
+
+var DefaultTimeout  = 30 * time.Second
 
 type rpcServer struct {
 	listener net.Listener
@@ -87,7 +90,7 @@ func (t *rpcServer) Run() error {
 			go func() {
 				defer t.wg.Done()
 				t.logger.Info("new connection", zap.String("from", conn.RemoteAddr().String()))
-				err := t.handleConnection(valuerpc.NewMsgConn(conn))
+				err := t.handleConnection(valuerpc.NewMsgConn(conn, DefaultTimeout))
 				if err != nil {
 					t.logger.Error("handle connection",
 						zap.String("from", conn.RemoteAddr().String()),

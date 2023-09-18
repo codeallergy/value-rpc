@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallnest/goframe"
 	"net"
+	"time"
 )
 
 
@@ -39,13 +40,14 @@ type MsgConn interface {
 	Conn() net.Conn
 }
 
-func NewMsgConn(conn net.Conn) MsgConn {
+func NewMsgConn(conn net.Conn, timeout time.Duration) MsgConn {
 	framedConn := goframe.NewLengthFieldBasedFrameConn(encoderConfig, decoderConfig, conn)
-	return &messageConnAdapter{framedConn}
+	return &messageConnAdapter{conn: framedConn, timeout: timeout}
 }
 
 type messageConnAdapter struct {
 	conn goframe.FrameConn
+	timeout  time.Duration
 }
 
 func (t *messageConnAdapter) ReadMessage() (value.Map, error) {
@@ -67,6 +69,9 @@ func (t *messageConnAdapter) WriteMessage(msg value.Map) error {
 	resp, err := value.Pack(msg)
 	if err != nil {
 		return errors.Errorf("msgpack pack, %v", err)
+	}
+	if err := t.conn.Conn().SetWriteDeadline(time.Now().Add(t.timeout)); err != nil {
+		return err
 	}
 	return t.conn.WriteFrame(resp)
 }
