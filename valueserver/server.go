@@ -16,7 +16,7 @@ import (
 )
 
 
-var DefaultTimeout  = 30 * time.Second
+var DefaultTimeout  = 10 * time.Second
 
 type rpcServer struct {
 	listener net.Listener

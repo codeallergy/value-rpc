@@ -7,13 +7,19 @@ package valuerpc
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/codeallergy/value"
 	"github.com/pkg/errors"
 	"github.com/smallnest/goframe"
+	"go.uber.org/atomic"
 	"net"
+	"sync"
 	"time"
 )
 
+var (
+	ErrClientClosed = fmt.Errorf("client closed")
+)
 
 var encoderConfig = goframe.EncoderConfig{
 	ByteOrder:                       binary.BigEndian,
@@ -48,6 +54,8 @@ func NewMsgConn(conn net.Conn, timeout time.Duration) MsgConn {
 type messageConnAdapter struct {
 	conn goframe.FrameConn
 	timeout  time.Duration
+	writeLock sync.Mutex
+	shutdown  atomic.Bool
 }
 
 func (t *messageConnAdapter) ReadMessage() (value.Map, error) {
@@ -66,17 +74,27 @@ func (t *messageConnAdapter) ReadMessage() (value.Map, error) {
 }
 
 func (t *messageConnAdapter) WriteMessage(msg value.Map) error {
+	if t.shutdown.Load() {
+		return ErrClientClosed
+	}
 	resp, err := value.Pack(msg)
 	if err != nil {
 		return errors.Errorf("msgpack pack, %v", err)
 	}
+	return t.doWriteFrame(resp)
+}
+
+func (t* messageConnAdapter) doWriteFrame(payload []byte) error {
+	t.writeLock.Lock()
+	defer t.writeLock.Unlock()
 	if err := t.conn.Conn().SetWriteDeadline(time.Now().Add(t.timeout)); err != nil {
 		return err
 	}
-	return t.conn.WriteFrame(resp)
+	return t.conn.WriteFrame(payload)
 }
 
 func (t *messageConnAdapter) Close() error {
+	t.shutdown.Store(true)
 	return t.conn.Close()
 }
 

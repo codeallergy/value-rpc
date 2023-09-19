@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var DefaultTimeout  = 30 * time.Second
+var DefaultTimeout  = 10 * time.Second
 
 type rpcConn struct {
 	conn         valuerpc.MsgConn
